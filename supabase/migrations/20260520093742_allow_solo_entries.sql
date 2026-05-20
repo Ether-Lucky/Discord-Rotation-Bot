@@ -1,0 +1,1 @@
+ALTER TABLE buddy_pairs ALTER COLUMN user2_id DROP NOT NULL;

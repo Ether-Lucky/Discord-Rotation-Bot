@@ -76,7 +76,6 @@ async function setRotationPaused(rotationId, paused) {
 // ─── Buddy Pairs ──────────────────────────────────────────────────────────────
 
 async function addPair(rotationId, user1Id, user2Id) {
-  // Validate: not the same user
   if (user1Id === user2Id) throw new Error('A user cannot be paired with themselves.');
 
   // Get current max position
@@ -116,14 +115,58 @@ async function addPair(rotationId, user1Id, user2Id) {
   return data;
 }
 
-async function removePair(rotationId, position) {
-  const { error } = await supabase
+/**
+ * Remove a pair by its UUID, then renumber remaining pairs starting from 0.
+ * Also adjusts current_index if the removed pair was at or before it.
+ */
+async function removePairById(rotationId, pairId) {
+  // Get all pairs in order before deletion
+  const pairs = await getPairs(rotationId);
+  const removedIndex = pairs.findIndex(p => p.id === pairId);
+  if (removedIndex === -1) throw new Error('Pair not found.');
+
+  // Delete the pair
+  const { error: deleteError } = await supabase
     .from('buddy_pairs')
     .delete()
-    .eq('rotation_id', rotationId)
-    .eq('position', position);
+    .eq('id', pairId);
 
-  if (error) throw new Error(`removePair: ${error.message}`);
+  if (deleteError) throw new Error(`removePairById: ${deleteError.message}`);
+
+  // Get remaining pairs and renumber positions sequentially from 0
+  const remaining = pairs.filter(p => p.id !== pairId);
+  for (let i = 0; i < remaining.length; i++) {
+    if (remaining[i].position !== i) {
+      const { error: updateError } = await supabase
+        .from('buddy_pairs')
+        .update({ position: i })
+        .eq('id', remaining[i].id);
+
+      if (updateError) throw new Error(`renumber position ${i}: ${updateError.message}`);
+    }
+  }
+
+  // Adjust current_index if needed so it doesn't point out of bounds
+  // or skip past the current pair unintentionally
+  if (remaining.length > 0) {
+    const rotation = await getRotation(rotationId);
+    let newIndex = rotation.current_index;
+
+    if (removedIndex < rotation.current_index) {
+      // Removed pair was before current — shift index back by 1
+      newIndex = rotation.current_index - 1;
+    } else if (rotation.current_index >= remaining.length) {
+      // Current index is now out of bounds — wrap to last pair
+      newIndex = remaining.length - 1;
+    }
+
+    if (newIndex !== rotation.current_index) {
+      await updateRotationIndex(rotationId, newIndex);
+    }
+  } else {
+    // No pairs left — reset index to 0
+    await updateRotationIndex(rotationId, 0);
+  }
 }
 
 async function getPairs(rotationId) {
@@ -200,7 +243,7 @@ module.exports = {
   setStatusMessageId,
   setRotationPaused,
   addPair,
-  removePair,
+  removePairById,
   getPairs,
   getCurrentPair,
   advanceRotation,

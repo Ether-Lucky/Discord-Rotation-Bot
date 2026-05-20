@@ -1,7 +1,6 @@
-const { getRotation, getPairs } = require('../services/rotationService');
+const { getRotation, getPairs, removePairById } = require('../services/rotationService');
 const { getGuildSettings } = require('../services/settingsService');
 const { updateRotationMessage } = require('../services/messageService');
-const supabase = require('../database/supabase');
 
 module.exports = {
   customId: 'removepair',
@@ -12,18 +11,8 @@ module.exports = {
     const rotationId = interaction.customId.split(':')[1];
     const pairId = interaction.values[0]; // selected pair UUID
 
-    // Delete the pair by its UUID
-    const { error } = await supabase
-      .from('buddy_pairs')
-      .delete()
-      .eq('id', pairId);
-
-    if (error) {
-      return interaction.editReply({
-        content: `❌ Failed to remove pair: ${error.message}`,
-        components: [],
-      });
-    }
+    // Remove the pair and renumber positions
+    await removePairById(rotationId, pairId);
 
     // Refresh state and update the dashboard
     const updatedRotation = await getRotation(rotationId);
@@ -38,7 +27,7 @@ module.exports = {
     }
 
     await interaction.editReply({
-      content: '✅ Pair removed. Dashboard updated.',
+      content: '✅ Pair removed and positions renumbered. Dashboard updated.',
       components: [],
     });
   },
