@@ -1,50 +1,55 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { requireManager } = require('../../utils/permissions');
-const { getActiveRotation, removePair, getPairs, getRotation } = require('../../services/rotationService');
+const { getActiveRotation, getPairs, getRotation } = require('../../services/rotationService');
 const { getGuildSettings } = require('../../services/settingsService');
 const { updateRotationMessage } = require('../../services/messageService');
+const supabase = require('../../database/supabase');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('rotation-removepair')
-    .setDescription('Remove a buddy pair by position.')
-    .addIntegerOption(opt =>
-      opt.setName('position')
-        .setDescription('Position number (from /rotation-listpairs).')
+    .setName('rotation-rename')
+    .setDescription('Rename the current active rotation.')
+    .addStringOption(opt =>
+      opt.setName('name')
+        .setDescription('The new name for the rotation.')
         .setRequired(true)
-        .setMinValue(1)
     ),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
     await requireManager(interaction);
 
-    const position = interaction.options.getInteger('position') - 1; // convert to 0-based
+    const newName = interaction.options.getString('name');
 
     const rotation = await getActiveRotation(interaction.guildId);
     if (!rotation) {
       return interaction.editReply('⚠️ No active rotation found.');
     }
 
-    const pairs = await getPairs(rotation.id);
-    if (position < 0 || position >= pairs.length) {
-      return interaction.editReply(`⚠️ Invalid position. There are ${pairs.length} pair(s).`);
-    }
+    const oldName = rotation.name;
 
-    await removePair(rotation.id, pairs[position].position);
+    // Update the name in the database
+    const { error } = await supabase
+      .from('rotations')
+      .update({ name: newName })
+      .eq('id', rotation.id);
+
+    if (error) throw new Error(`rotation-rename: ${error.message}`);
 
     // Refresh state and update the dashboard
     const updatedRotation = await getRotation(rotation.id);
-    const updatedPairs = await getPairs(rotation.id);
+    const pairs = await getPairs(rotation.id);
     const settings = await getGuildSettings(interaction.guildId);
 
     if (settings) {
       const channel = await interaction.guild.channels
         .fetch(settings.display_channel_id)
         .catch(() => null);
-      if (channel) await updateRotationMessage(channel, updatedRotation, updatedPairs);
+      if (channel) await updateRotationMessage(channel, updatedRotation, pairs);
     }
 
-    await interaction.editReply(`✅ Pair at position **${position + 1}** removed. Dashboard updated.`);
+    await interaction.editReply(
+      `✅ Rotation renamed from **${oldName}** to **${newName}**. Dashboard updated.`
+    );
   },
 };
