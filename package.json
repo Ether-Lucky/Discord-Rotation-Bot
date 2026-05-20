@@ -1,0 +1,22 @@
+{
+    "name": "discord-buddy-bot",
+    "version": "1.0.0",
+    "description": "A Discord bot for managing buddy rotation systems.",
+    "main": "src/index.js",
+    "scripts": {
+      "start": "node src/index.js",
+      "dev": "nodemon src/index.js"
+    },
+    "dependencies": {
+      "@supabase/supabase-js": "^2.39.0",
+      "discord.js": "^14.14.1",
+      "dotenv": "^16.4.1",
+      "uuid": "^9.0.0"
+    },
+    "devDependencies": {
+      "nodemon": "^3.0.3"
+    },
+    "engines": {
+      "node": ">=18.0.0"
+    }
+  }
