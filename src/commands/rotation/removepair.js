@@ -1,25 +1,15 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const { requireManager } = require('../../utils/permissions');
-const { getActiveRotation, removePair, getPairs, getRotation } = require('../../services/rotationService');
-const { getGuildSettings } = require('../../services/settingsService');
-const { updateRotationMessage } = require('../../services/messageService');
+const { getActiveRotation, getPairs } = require('../../services/rotationService');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rotation-removepair')
-    .setDescription('Remove a buddy pair by position.')
-    .addIntegerOption(opt =>
-      opt.setName('position')
-        .setDescription('Position number (from /rotation-listpairs).')
-        .setRequired(true)
-        .setMinValue(1)
-    ),
+    .setDescription('Remove a buddy pair from the active rotation.'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
     await requireManager(interaction);
-
-    const position = interaction.options.getInteger('position') - 1; // convert to 0-based
 
     const rotation = await getActiveRotation(interaction.guildId);
     if (!rotation) {
@@ -27,24 +17,42 @@ module.exports = {
     }
 
     const pairs = await getPairs(rotation.id);
-    if (position < 0 || position >= pairs.length) {
-      return interaction.editReply(`⚠️ Invalid position. There are ${pairs.length} pair(s).`);
+    if (!pairs.length) {
+      return interaction.editReply('⚠️ There are no pairs to remove.');
     }
 
-    await removePair(rotation.id, pairs[position].position);
+    // Fetch guild members to get display names
+    const options = await Promise.all(pairs.map(async (pair, index) => {
+      let user1Name, user2Name;
+      try {
+        const member1 = await interaction.guild.members.fetch(pair.user1_id);
+        user1Name = member1.displayName;
+      } catch {
+        user1Name = `User ${pair.user1_id}`;
+      }
+      try {
+        const member2 = await interaction.guild.members.fetch(pair.user2_id);
+        user2Name = member2.displayName;
+      } catch {
+        user2Name = `User ${pair.user2_id}`;
+      }
 
-    // Refresh state and update the dashboard
-    const updatedRotation = await getRotation(rotation.id);
-    const updatedPairs = await getPairs(rotation.id);
-    const settings = await getGuildSettings(interaction.guildId);
+      return {
+        label: `${index + 1}. ${user1Name} & ${user2Name}`,
+        value: pair.id, // use the pair's UUID as the value
+      };
+    }));
 
-    if (settings) {
-      const channel = await interaction.guild.channels
-        .fetch(settings.display_channel_id)
-        .catch(() => null);
-      if (channel) await updateRotationMessage(channel, updatedRotation, updatedPairs);
-    }
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`removepair:${rotation.id}`)
+      .setPlaceholder('Select a pair to remove...')
+      .addOptions(options);
 
-    await interaction.editReply(`✅ Pair at position **${position + 1}** removed. Dashboard updated.`);
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    await interaction.editReply({
+      content: '🗑️ Select the pair you want to remove:',
+      components: [row],
+    });
   },
 };
