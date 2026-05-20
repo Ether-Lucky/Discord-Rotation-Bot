@@ -4,11 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers,
-  ],
+  intents: [GatewayIntentBits.Guilds],
 });
 
 client.commands = new Collection();
@@ -29,13 +25,13 @@ for (const folder of commandFolders) {
   }
 }
 
-// ─── Load Button Handlers ─────────────────────────────────────────────────────
-const buttonHandlers = new Collection();
+// ─── Load Button / Select Menu Handlers ──────────────────────────────────────
+const interactionHandlers = new Collection();
 const buttonFolder = path.join(__dirname, 'buttons');
 const buttonFiles = fs.readdirSync(buttonFolder).filter(f => f.endsWith('.js'));
 for (const file of buttonFiles) {
   const handler = require(path.join(buttonFolder, file));
-  buttonHandlers.set(handler.customId, handler);
+  interactionHandlers.set(handler.customId, handler);
 }
 
 // ─── Register Slash Commands ──────────────────────────────────────────────────
@@ -65,9 +61,9 @@ client.on('interactionCreate', async (interaction) => {
       await command.execute(interaction);
     }
 
-    if (interaction.isButton()) {
+    if (interaction.isButton() || interaction.isStringSelectMenu()) {
       const [prefix] = interaction.customId.split(':');
-      const handler = buttonHandlers.get(prefix);
+      const handler = interactionHandlers.get(prefix);
       if (handler) await handler.execute(interaction);
     }
   } catch (err) {
