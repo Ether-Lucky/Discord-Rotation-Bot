@@ -4,11 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers,
-  ],
+  intents: [GatewayIntentBits.Guilds],
 });
 
 client.commands = new Collection();

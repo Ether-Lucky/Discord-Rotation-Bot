@@ -1,6 +1,5 @@
 -- ============================================================
 --  Discord Buddy Rotation Bot — Supabase Schema
---  Run this in your Supabase SQL Editor.
 -- ============================================================
 
 -- ── Guild Settings ────────────────────────────────────────────
@@ -59,10 +58,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_guild_settings_updated_at ON guild_settings;
 CREATE TRIGGER update_guild_settings_updated_at
   BEFORE UPDATE ON guild_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_rotations_updated_at ON rotations;
 CREATE TRIGGER update_rotations_updated_at
   BEFORE UPDATE ON rotations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
