@@ -1,35 +1,30 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getActiveRotation, getPairs, getRotation } = require('../../services/rotationService');
+const { pickRotation } = require('../../utils/rotationPicker');
+const { getPairs } = require('../../services/rotationService');
 const { formatPairWithIndex } = require('../../utils/formatPair');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rotation-listpairs')
-    .setDescription('List all buddy pairs in the active rotation.'),
+    .setDescription('List all entries in a rotation.'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const rotation = await getActiveRotation(interaction.guildId);
-    if (!rotation) {
-      return interaction.editReply('⚠️ No active rotation found.');
-    }
+    const rotation = await pickRotation(interaction, 'listpairs', {});
+    if (!rotation) return;
 
     const pairs = await getPairs(rotation.id);
-
-    if (!pairs.length) {
-      return interaction.editReply(`**${rotation.name}** has no pairs yet. Use \`/rotation-addpair\`.`);
-    }
+    if (!pairs.length) return interaction.editReply(`**${rotation.name}** has no entries yet.`);
 
     const currentIndex = rotation.current_index % pairs.length;
     const lines = pairs.map((pair, i) => {
-      const marker = i === currentIndex ? ' 🎯' : '';
-      return `${formatPairWithIndex(pair, i)}${marker}`;
+      const entry = pair.user2_id
+        ? `**${i + 1}.** <@${pair.user1_id}> & <@${pair.user2_id}>`
+        : `**${i + 1}.** <@${pair.user1_id}> *(solo)*`;
+      return entry + (i === currentIndex ? ' 🎯' : '');
     });
 
-    await interaction.editReply(
-      `**🔄 ${rotation.name} — Pairs:**\n\n${lines.join('\n')}\n\n` +
-      `*🎯 = current pair*`
-    );
+    await interaction.editReply(`**🔄 ${rotation.name} — Entries:**\n\n${lines.join('\n')}\n\n*🎯 = current*`);
   },
 };

@@ -1,18 +1,18 @@
 # 🔄 Discord Buddy Rotation Bot
 
-A Discord bot that manages a buddy rotation system. Pairs or solo users take turns, and the current entry can mark themselves as "Done" to advance the rotation. Managers can also force-advance, rename, or delete rotations at any time.
+A Discord bot that manages a buddy rotation system. Pairs or solo users take turns, and the current entry can mark themselves as "Done" to advance the rotation. Managers can also manually navigate or delete rotations at any time. Multiple rotations per server are supported.
 
 ---
 
 ## 📋 Features
 
 - Admin setup with configurable manager role and display channel
+- **Multiple rotations per server** — each command shows a picker when more than one exists
 - Create, rename, and delete rotations
 - Add buddy pairs or solo entries
 - Remove entries via dropdown menu (auto-renumbers positions)
 - Persistent live dashboard message that auto-updates on every change
 - ✅ Done button — only the current pair/solo can press it
-- ⏩ Force advance — managers can skip the current entry without Done
 - Manual controls: next, previous, reset, pause, resume
 - Completion logging via Supabase
 
@@ -109,12 +109,12 @@ discord-buddy-bot/
 │   │       ├── next.js               # /rotation-next
 │   │       ├── previous.js           # /rotation-previous
 │   │       ├── reset.js              # /rotation-reset
-│   │       ├── force.js              # /rotation-force
 │   │       ├── pause.js              # /rotation-pause
 │   │       └── resume.js             # /rotation-resume
 │   ├── buttons/
 │   │   ├── doneButton.js             # ✅ Done button handler
 │   │   ├── removePairSelect.js       # 🗑️ Remove pair dropdown handler
+│   │   ├── rotationPickHandler.js    # 🔄 Rotation picker dropdown handler
 │   │   ├── deleteRotation.js         # Confirm delete button handler
 │   │   └── cancelDelete.js           # Cancel delete button handler
 │   ├── services/
@@ -125,6 +125,7 @@ discord-buddy-bot/
 │   │   └── supabase.js               # Supabase client
 │   └── utils/
 │       ├── permissions.js            # Manager role checks
+│       ├── rotationPicker.js         # Shared rotation selection utility
 │       └── formatPair.js             # Pair formatting helpers
 ├── schema.sql                        # Supabase table definitions
 ├── .env.example                      # Environment variable template
@@ -150,8 +151,8 @@ discord-buddy-bot/
 | Command | Description |
 |---|---|
 | `/rotation-create name:` | Create a new rotation |
-| `/rotation-rename name:` | Rename the active rotation |
-| `/rotation-delete` | Delete the active rotation (with confirmation) |
+| `/rotation-rename name:` | Rename a rotation |
+| `/rotation-delete` | Delete a rotation (with confirmation) |
 | `/rotation-addpair user1: user2:` | Add a buddy pair |
 | `/rotation-addsolo user:` | Add a single user with no partner |
 | `/rotation-removepair` | Remove an entry via dropdown menu |
@@ -161,9 +162,10 @@ discord-buddy-bot/
 | `/rotation-next` | Manually advance to the next entry |
 | `/rotation-previous` | Go back one entry |
 | `/rotation-reset` | Reset to the first entry |
-| `/rotation-force` | Force-advance the rotation, skipping the current entry |
 | `/rotation-pause` | Pause rotation (disables Done button) |
 | `/rotation-resume` | Resume rotation (re-enables Done button) |
+
+> **Multiple rotations:** When more than one rotation exists in the server, every command will show a dropdown asking which rotation to target before proceeding.
 
 ---
 
@@ -212,6 +214,8 @@ discord-buddy-bot/
 - **Unauthorized Done click** — silently rejected with ephemeral error
 - **Paused rotation** — Done button disabled until resumed
 - **Remove pair** — remaining positions renumbered; current index adjusted automatically
+- **Single rotation** — picker is skipped, command proceeds immediately
+- **Multiple rotations** — dropdown appears to select which rotation to target
 
 ---
 
@@ -222,7 +226,3 @@ discord-buddy-bot/
 - Manager commands are role-gated; only admins and the configured manager role can use them
 
 ---
-
-## 📄 License
-
-MIT

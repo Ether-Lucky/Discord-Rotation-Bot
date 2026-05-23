@@ -1,36 +1,37 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { requireManager } = require('../../utils/permissions');
-const { getActiveRotation, advanceRotation, getPairs, getRotation } = require('../../services/rotationService');
+const { pickRotation } = require('../../utils/rotationPicker');
+const { advanceRotation, getPairs, getRotation } = require('../../services/rotationService');
 const { getGuildSettings } = require('../../services/settingsService');
 const { updateRotationMessage, sendTurnNotification } = require('../../services/messageService');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rotation-next')
-    .setDescription('Manually advance the rotation to the next pair.'),
+    .setDescription('Manually advance a rotation to the next entry.'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
     await requireManager(interaction);
 
-    const settings = await getGuildSettings(interaction.guildId);
-    const rotation = await getActiveRotation(interaction.guildId);
-    if (!rotation) return interaction.editReply('⚠️ No active rotation found.');
+    const rotation = await pickRotation(interaction, 'next', {});
+    if (!rotation) return;
+
+    const pairs = await getPairs(rotation.id);
+    if (!pairs.length) return interaction.editReply('⚠️ No entries in this rotation.');
 
     await advanceRotation(rotation.id);
+    const updated = await getRotation(rotation.id);
+    const updatedPairs = await getPairs(rotation.id);
+    const currentPair = updatedPairs[updated.current_index % updatedPairs.length];
 
-    const updated = await getRotation(rotation.id); // fresh state
-    const pairs = await getPairs(rotation.id);
-    const currentPair = pairs[updated.current_index % pairs.length];
-
+    const settings = await getGuildSettings(interaction.guildId);
     if (settings) {
       const channel = await interaction.guild.channels.fetch(settings.display_channel_id).catch(() => null);
-      if (channel) {
-        await updateRotationMessage(channel, updated, pairs);
-        await sendTurnNotification(channel, currentPair);
-      }
+      if (channel) { await updateRotationMessage(channel, updated, updatedPairs); await sendTurnNotification(channel, currentPair); }
     }
 
-    await interaction.editReply(`✅ Rotation advanced. Current pair: <@${currentPair.user1_id}> & <@${currentPair.user2_id}>`);
+    const mention = currentPair.user2_id ? `<@${currentPair.user1_id}> & <@${currentPair.user2_id}>` : `<@${currentPair.user1_id}>`;
+    await interaction.editReply(`✅ **${rotation.name}** advanced. Current: ${mention}`);
   },
 };
