@@ -4,7 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
 client.commands = new Collection();
@@ -42,10 +42,7 @@ client.once('ready', async () => {
 
   try {
     console.log('🔄 Registering slash commands...');
-    await rest.put(
-      Routes.applicationCommands(client.user.id),
-      { body: allCommands }
-    );
+    await rest.put(Routes.applicationCommands(client.user.id), { body: allCommands });
     console.log('✅ Slash commands registered.');
   } catch (err) {
     console.error('❌ Failed to register commands:', err);
@@ -68,7 +65,7 @@ client.on('interactionCreate', async (interaction) => {
     }
   } catch (err) {
     console.error('❌ Interaction error:', err);
-    const msg = { content: '❌ An error occurred.', ephemeral: true };
+    const msg = { content: `❌ ${err.message || 'An error occurred.'}`, ephemeral: true };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(msg).catch(() => {});
     } else {

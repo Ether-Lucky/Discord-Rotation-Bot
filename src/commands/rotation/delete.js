@@ -1,22 +1,19 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { requireManager } = require('../../utils/permissions');
-const { getActiveRotation } = require('../../services/rotationService');
+const { pickRotation } = require('../../utils/rotationPicker');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rotation-delete')
-    .setDescription('Delete the current active rotation and all its pairs.'),
+    .setDescription('Delete a rotation and all its entries.'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
     await requireManager(interaction);
 
-    const rotation = await getActiveRotation(interaction.guildId);
-    if (!rotation) {
-      return interaction.editReply('⚠️ No active rotation found.');
-    }
+    const rotation = await pickRotation(interaction, 'delete', {});
+    if (!rotation) return;
 
-    // Ask for confirmation before deleting
     const confirmRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`confirmdelete:${rotation.id}`)
@@ -29,7 +26,7 @@ module.exports = {
     );
 
     await interaction.editReply({
-      content: `⚠️ Are you sure you want to delete the rotation **${rotation.name}**?\nThis will remove all its pairs and cannot be undone.`,
+      content: `⚠️ Are you sure you want to delete **${rotation.name}**?\nThis will remove all its entries and cannot be undone.`,
       components: [confirmRow],
     });
   },

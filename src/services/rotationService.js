@@ -32,18 +32,18 @@ async function getRotation(rotationId) {
   return data;
 }
 
-async function getActiveRotation(guildId) {
+/**
+ * Get all rotations for a guild.
+ */
+async function getGuildRotations(guildId) {
   const { data, error } = await supabase
     .from('rotations')
     .select('*')
     .eq('guild_id', guildId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .order('created_at', { ascending: true });
 
-  if (error && error.code !== 'PGRST116') throw new Error(`getActiveRotation: ${error.message}`);
-  return data || null;
+  if (error) throw new Error(`getGuildRotations: ${error.message}`);
+  return data || [];
 }
 
 async function updateRotationIndex(rotationId, newIndex) {
@@ -78,7 +78,6 @@ async function setRotationPaused(rotationId, paused) {
 async function addPair(rotationId, user1Id, user2Id) {
   if (user1Id === user2Id) throw new Error('A user cannot be paired with themselves.');
 
-  // Get current max position
   const { data: pairs } = await supabase
     .from('buddy_pairs')
     .select('position')
@@ -88,7 +87,6 @@ async function addPair(rotationId, user1Id, user2Id) {
 
   const nextPosition = pairs && pairs.length > 0 ? pairs[0].position + 1 : 0;
 
-  // Check for duplicate pair
   const { data: existing } = await supabase
     .from('buddy_pairs')
     .select('id')
@@ -115,17 +113,11 @@ async function addPair(rotationId, user1Id, user2Id) {
   return data;
 }
 
-/**
- * Remove a pair by its UUID, then renumber remaining pairs starting from 0.
- * Also adjusts current_index if the removed pair was at or before it.
- */
 async function removePairById(rotationId, pairId) {
-  // Get all pairs in order before deletion
   const pairs = await getPairs(rotationId);
   const removedIndex = pairs.findIndex(p => p.id === pairId);
   if (removedIndex === -1) throw new Error('Pair not found.');
 
-  // Delete the pair
   const { error: deleteError } = await supabase
     .from('buddy_pairs')
     .delete()
@@ -133,38 +125,25 @@ async function removePairById(rotationId, pairId) {
 
   if (deleteError) throw new Error(`removePairById: ${deleteError.message}`);
 
-  // Get remaining pairs and renumber positions sequentially from 0
   const remaining = pairs.filter(p => p.id !== pairId);
   for (let i = 0; i < remaining.length; i++) {
     if (remaining[i].position !== i) {
-      const { error: updateError } = await supabase
-        .from('buddy_pairs')
-        .update({ position: i })
-        .eq('id', remaining[i].id);
-
-      if (updateError) throw new Error(`renumber position ${i}: ${updateError.message}`);
+      await supabase.from('buddy_pairs').update({ position: i }).eq('id', remaining[i].id);
     }
   }
 
-  // Adjust current_index if needed so it doesn't point out of bounds
-  // or skip past the current pair unintentionally
   if (remaining.length > 0) {
     const rotation = await getRotation(rotationId);
     let newIndex = rotation.current_index;
-
     if (removedIndex < rotation.current_index) {
-      // Removed pair was before current — shift index back by 1
       newIndex = rotation.current_index - 1;
     } else if (rotation.current_index >= remaining.length) {
-      // Current index is now out of bounds — wrap to last pair
       newIndex = remaining.length - 1;
     }
-
     if (newIndex !== rotation.current_index) {
       await updateRotationIndex(rotationId, newIndex);
     }
   } else {
-    // No pairs left — reset index to 0
     await updateRotationIndex(rotationId, 0);
   }
 }
@@ -197,7 +176,6 @@ async function advanceRotation(rotationId) {
   const newIndex = (rotation.current_index + 1) % pairs.length;
   await updateRotationIndex(rotationId, newIndex);
 
-  // Log completion
   await supabase.from('completion_logs').insert({
     id: uuidv4(),
     rotation_id: rotationId,
@@ -222,8 +200,6 @@ async function resetRotation(rotationId) {
   await updateRotationIndex(rotationId, 0);
 }
 
-// ─── Completion Log ───────────────────────────────────────────────────────────
-
 async function logCompletion(rotationId, pairPosition, completedBy) {
   const { error } = await supabase.from('completion_logs').insert({
     id: uuidv4(),
@@ -239,7 +215,7 @@ async function logCompletion(rotationId, pairPosition, completedBy) {
 module.exports = {
   createRotation,
   getRotation,
-  getActiveRotation,
+  getGuildRotations,
   setStatusMessageId,
   setRotationPaused,
   addPair,
