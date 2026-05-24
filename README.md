@@ -7,7 +7,7 @@ A Discord bot that manages a buddy rotation system. Pairs or solo users take tur
 ## 📋 Features
 
 - Admin setup with configurable manager role and display channel
-- **Multiple rotations per server** — each command shows a picker when more than one exists
+- Multiple rotations per server — each command shows a picker when more than one exists
 - Create, rename, and delete rotations
 - Add buddy pairs or solo entries
 - Remove entries via dropdown menu (auto-renumbers positions)
@@ -157,7 +157,8 @@ discord-buddy-bot/
 | `/rotation-addsolo user:` | Add a single user with no partner |
 | `/rotation-removepair` | Remove an entry via dropdown menu |
 | `/rotation-listpairs` | List all entries (current marked 🎯) |
-| `/rotation-publish` | Post the live dashboard message |
+| `/rotation-publish` | Post the live dashboard message (blocked if already published) |
+| `/rotation-unpublish` | Remove the dashboard message and allow republishing |
 | `/rotation-show` | Display rotation status inline |
 | `/rotation-next` | Manually advance to the next entry |
 | `/rotation-previous` | Go back one entry |

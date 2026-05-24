@@ -99,12 +99,29 @@ module.exports = {
 
       case 'publish': {
         if (!settings) return interaction.editReply({ content: '⚠️ Run `/setup` first.', components: [] });
+        if (rotation.status_message_id) {
+          return interaction.editReply({ content: `⚠️ **${rotation.name}** is already published. Use \`/rotation-unpublish\` first to republish it.`, components: [] });
+        }
         const pairs = await getPairs(rotationId);
         if (!pairs.length) return interaction.editReply({ content: '⚠️ Add at least one entry before publishing.', components: [] });
         const channel = await getChannel();
         if (!channel) return interaction.editReply({ content: '⚠️ Display channel not found.', components: [] });
         await publishRotationMessage(channel, rotation, pairs);
         await interaction.editReply({ content: `✅ **${rotation.name}** published in ${channel}!`, components: [] });
+        break;
+      }
+
+      case 'unpublish': {
+        if (!rotation.status_message_id) {
+          return interaction.editReply({ content: `⚠️ **${rotation.name}** is not currently published.`, components: [] });
+        }
+        try {
+          const ch = await getChannel();
+          if (ch) { const msg = await ch.messages.fetch(rotation.status_message_id); await msg.delete(); }
+        } catch { /* message already gone */ }
+        const { setStatusMessageId } = require('../services/rotationService');
+        await setStatusMessageId(rotationId, null);
+        await interaction.editReply({ content: `✅ **${rotation.name}** unpublished. You can now republish it with \`/rotation-publish\`.`, components: [] });
         break;
       }
 

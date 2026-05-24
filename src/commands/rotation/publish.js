@@ -20,6 +20,14 @@ module.exports = {
     const rotation = await pickRotation(interaction, 'publish', {});
     if (!rotation) return;
 
+    // Block if already published
+    if (rotation.status_message_id) {
+      return interaction.editReply(
+        `⚠️ **${rotation.name}** is already published.\n` +
+        `Use \`/rotation-unpublish\` first if you want to republish it.`
+      );
+    }
+
     const pairs = await getPairs(rotation.id);
     if (!pairs.length) return interaction.editReply('⚠️ Add at least one entry before publishing.');
 
